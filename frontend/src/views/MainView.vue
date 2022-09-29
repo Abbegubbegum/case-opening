@@ -33,7 +33,6 @@ import {
 	signInWithPopup,
 	getAuth,
 	GoogleAuthProvider,
-	onAuthStateChanged,
 	signOut,
 } from "firebase/auth";
 
@@ -47,37 +46,34 @@ export default defineComponent({
 	methods: {
 		signInUser() {
 			signInWithPopup(getAuth(), new GoogleAuthProvider())
-				.then((__data) => {
+				.then(async (data) => {
 					const user = getAuth().currentUser;
 					if (user) {
 						this.authed = true;
+						let idToken = await user.getIdToken();
+						await fetch("/api/login", {
+							method: "POST",
+							headers: {
+								Accept: "application/json",
+								"Content-Type": "application/json",
+								"CSRF-Token": this.$cookies.get("XSRF-TOKEN"),
+							},
+							body: JSON.stringify({ idToken }),
+						});
+						await signOut(getAuth());
 					}
 				})
 				.catch((err) => {
-					alert("Error Signing in with Google");
-					console.error(err);
+					console.log("Error Signing in with Google " + err);
 				});
 		},
 		signOutUser() {
-			signOut(getAuth());
+			fetch("/api/logout").then((res) => {
+				this.authed = false;
+			});
 		},
 	},
 	components: { CaseCanvas },
-	created() {
-		let user = getAuth().currentUser;
-
-		if (user) {
-			this.authed = true;
-		}
-
-		onAuthStateChanged(getAuth(), (user) => {
-			if (user) {
-				this.authed = true;
-			} else {
-				this.authed = false;
-			}
-		});
-	},
 });
 </script>
 
