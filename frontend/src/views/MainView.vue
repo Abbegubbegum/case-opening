@@ -73,6 +73,15 @@ export default defineComponent({
 			});
 		},
 	},
+	created() {
+		try {
+			fetch("/api/session").then((res) => {
+				if (res.status === 200) {
+					this.authed = true;
+				}
+			});
+		} catch (err) {}
+	},
 	components: { CaseCanvas },
 });
 </script>

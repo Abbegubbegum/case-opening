@@ -29,12 +29,26 @@ app.use(csrfMiddleware);
 
 app.all("*", (req, res, next) => {
 	res.cookie("XSRF-TOKEN", req.csrfToken());
-	console.log("fdsafsda");
 	next();
 });
 
 app.get("/", csrfMiddleware, (req, res) => {
 	res.sendFile(resolve("../frontend/dist/index.html"));
+});
+
+app.get("/api/session", csrfMiddleware, (req, res) => {
+	const sessionCookie = req.cookies.session || "";
+
+	admin
+		.auth()
+		.verifySessionCookie(sessionCookie, true)
+		.then(() => {
+			res.sendStatus(200);
+		})
+		.catch((err) => {
+			res.clearCookie("session");
+			res.status(202).send(err);
+		});
 });
 
 app.post("/api/login", csrfMiddleware, (req, res) => {
@@ -65,11 +79,7 @@ app.get("/api/logout", csrfMiddleware, (req, res) => {
 	res.sendStatus(200);
 });
 
-app.get("/api/inventory", csrfMiddleware, (req, res) => {
-	const sessionCookie = req.cookies.session || "";
-
-	admin.auth().verifySessionCookie(sessionCookie, true);
-});
+app.get("/api/inventory", csrfMiddleware, (req, res) => {});
 
 app.listen(port, () => {
 	console.log(`Listening on http://localhost:${port}`);
