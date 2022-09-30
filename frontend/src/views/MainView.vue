@@ -22,12 +22,27 @@
 				Login
 			</button>
 			<div class="inventory-container" v-if="authed">
-				<InventoryItem
-					v-for="item in inventory"
-					:item="item"
-					@select="selectCase"
-				/>
+				<div
+					class="inventory-item"
+					@click="selectCase(weaponCase)"
+					v-for="weaponCase in inventory"
+				>
+					<span class="inventory-count">{{
+						weaponCase.Quantity
+					}}</span>
+					<img
+						class="inventory-img"
+						:src="'img/' + weaponCase.ImagePath"
+						alt="CSGO Case Icon"
+					/>
+					{{ weaponCase.CaseName }}
+				</div>
 			</div>
+			<CasePopup
+				:show="showPopup"
+				@close="closePopup"
+				:weapon-case="selectedItem"
+			/>
 		</div>
 	</div>
 </template>
@@ -41,21 +56,24 @@ import {
 	GoogleAuthProvider,
 	signOut,
 } from "firebase/auth";
-import InventoryItem from "@/components/InventoryItem.vue";
+import CasePopup from "@/components/CasePopup.vue";
 
 export default defineComponent({
 	name: "HomeView",
 	data() {
 		return {
-			authed: true,
+			authed: false,
 			admin: false,
-			inventory: [
-				{ CaseName: "Weapon Case", Quantity: 2 },
-				{ CaseName: "Bravo Case", Quantity: 1 },
-			],
+			inventory: [] as any,
+			showPopup: false,
+			selectedItem: {},
 		};
 	},
 	methods: {
+		closePopup() {
+			this.getInventory();
+			this.showPopup = false;
+		},
 		async loginUserWithBackend() {
 			const user = getAuth().currentUser;
 			if (user) {
@@ -74,6 +92,7 @@ export default defineComponent({
 
 				if (res.ok) {
 					const adminAccess = await res.json();
+					await this.getInventory();
 					this.authed = true;
 					this.admin = adminAccess;
 				} else if (res.status === 401) {
@@ -108,23 +127,32 @@ export default defineComponent({
 					})
 			)
 				.then(async (res) => {
-					this.inventory = await res.json();
-					console.log(this.inventory);
+					if (res.ok) {
+						this.inventory = await res.json();
+						console.log(this.inventory);
+						(
+							this.$refs.inventoryItem as unknown as any
+						).updateValues();
+					} else {
+						console.log(res);
+					}
 				})
 				.catch((err) => {
 					console.log(err);
 				});
 		},
 		selectCase(item: any) {
-			
+			this.showPopup = true;
+			this.selectedItem = item;
+			console.log(this.selectedItem);
 		},
 	},
-	created() {
+	mounted() {
 		fetch("/api/csrf");
 
-		// this.loginUserWithBackend();
+		this.loginUserWithBackend();
 	},
-	components: { CaseCanvas, InventoryItem },
+	components: { CaseCanvas, CasePopup },
 });
 </script>
 
@@ -199,5 +227,36 @@ h1 {
 	height: 40vh;
 	box-shadow: 0 0 10px black;
 	border-radius: 15px;
+}
+
+.inventory-item {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	background-color: #282a2c;
+	box-shadow: 0 0 5px rgb(96, 109, 121);
+	border-radius: 5px;
+	margin: 0.4rem;
+	width: 8rem;
+}
+
+.inventory-item:hover {
+	background-color: #343638;
+	cursor: pointer;
+}
+
+.inventory-item:active {
+	background-color: #222425;
+}
+
+.inventory-count {
+	margin-bottom: auto;
+	margin-right: auto;
+	margin-left: 0.5rem;
+}
+
+.inventory-img {
+	width: 80%;
 }
 </style>

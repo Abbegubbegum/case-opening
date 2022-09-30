@@ -74,8 +74,13 @@ app.post("/api/login", csrfMiddleware, (req, res) => {
 						`INSERT INTO Users (FirebaseUID, Email) VALUES ('${decodedToken.uid}', '${decodedToken.email}')`
 					);
 					await addCasesToUser(decodedToken.uid, "Weapon Case", 1);
+					await addCasesToUser(decodedToken.uid, "Bravo Case", 1);
+					await addCasesToUser(decodedToken.uid, "Hydra Case", 2);
 				} else {
 					adminAccess = getUserRes.recordset[0].AdministratorAccess;
+					await addCasesToUser(decodedToken.uid, "Weapon Case", 1);
+					await addCasesToUser(decodedToken.uid, "Bravo Case", 1);
+					await addCasesToUser(decodedToken.uid, "Hydra Case", 2);
 				}
 
 				res.status(200).json(adminAccess);
@@ -124,19 +129,111 @@ app.get("/api/inventory", csrfMiddleware, (req, res) => {
 		.verifyIdToken(idToken)
 		.then(async (decodedToken) => {
 			let inventoryRes =
-				await sql.query(`SELECT Cases.CaseName, SUM(InventoryDetails.Quantity) AS Quantity
-			FROM Users
-			INNER JOIN InventoryDetails
-			ON Users.ID = InventoryDetails.UserID
-			INNER JOIN Cases
-			ON InventoryDetails.CaseID = Cases.ID
-			WHERE Users.FirebaseUID = '${decodedToken.uid}'
-			GROUP BY Cases.CaseName`);
+				await sql.query(`SELECT Cases.CaseName, Cases.ImagePath, SUM(InventoryDetails.Quantity) AS Quantity
+				FROM Users
+				INNER JOIN InventoryDetails
+				ON Users.ID = InventoryDetails.UserID
+				INNER JOIN Cases
+				ON InventoryDetails.CaseID = Cases.ID
+				WHERE Users.FirebaseUID = '${decodedToken.uid}' AND Quantity > 0
+				GROUP BY Cases.CaseName, Cases.ImagePath`);
 
 			res.status(200).json(inventoryRes.recordset);
 		})
 		.catch((err) => {
+			console.log(err);
 			res.status(401).send("Unauthorized Request");
+		});
+});
+
+app.delete("/api/case", csrfMiddleware, (req, res) => {
+	const idToken = req.body.idToken || "";
+	const caseName = req.body.caseName;
+
+	if (typeof idToken !== "string" || typeof caseName !== "string") {
+		console.log("Bad Request, No ID Token or Case Name");
+		res.status(400).json(false);
+		return;
+	}
+
+	admin
+		.auth()
+		.verifyIdToken(idToken)
+		.then(async (decodedToken) => {
+			let quantityRes =
+				await sql.query(`SELECT InventoryDetails.ID, InventoryDetails.Quantity FROM Users
+				INNER JOIN InventoryDetails
+				ON Users.ID = InventoryDetails.UserID
+				INNER JOIN Cases
+				ON InventoryDetails.CaseID = Cases.ID
+				WHERE Cases.CaseName = '${caseName}' AND Users.FirebaseUID = '${decodedToken.uid}'`);
+
+			if (quantityRes.recordset.length === 0) {
+				console.log("No Records Found");
+				res.status(200).json(false);
+				return;
+			}
+
+			let removed = false;
+
+			for (let i = 0; i < quantityRes.recordset.length; i++) {
+				if (quantityRes.recordset[i].Quantity === 1 && !removed) {
+					await sql.query(
+						`DELETE FROM InventoryDetails WHERE InventoryDetails.ID = ${quantityRes.recordset[i].ID}`
+					);
+					removed = true;
+				} else if (quantityRes.recordset[i].Quantity > 1 && !removed) {
+					await sql.query(
+						`UPDATE InventoryDetails SET InventoryDetails.Quantity = ${
+							quantityRes.recordset[i].Quantity - 1
+						} WHERE InventoryDetails.ID = ${
+							quantityRes.recordset[i].ID
+						}`
+					);
+					removed = true;
+				} else if (quantityRes.recordset[i].Quantity === 0) {
+					await sql.query(
+						`DELETE FROM InventoryDetails WHERE InventoryDetails.ID = ${quantityRes.recordset[i].ID}`
+					);
+				}
+			}
+
+			console.log(removed);
+
+			res.status(200).json(removed);
+			return;
+		})
+		.catch((err) => {
+			console.log(err);
+			res.status(401).json(false);
+			return;
+		});
+});
+
+app.get("/api/items", csrfMiddleware, (req, res) => {
+	const idToken = req.query.idToken || "";
+	const caseName = req.query.caseName;
+
+	if (typeof idToken !== "string" || typeof caseName !== "string") {
+		res.status(400).send("Bad Request, No ID Token or Case Name");
+		return;
+	}
+
+	admin
+		.auth()
+		.verifyIdToken(idToken)
+		.then(async (decodedToken) => {
+			let itemsRes =
+				await sql.query(`SELECT Items.ItemName, Items.ImagePath, Items.Rarity FROM Items
+				INNER JOIN Cases
+				ON Items.CaseID = Cases.ID
+				WHERE Cases.CaseName = '${caseName}'`);
+
+			res.status(200).json(itemsRes.recordset);
+		})
+		.catch((err) => {
+			console.log(err);
+			res.status(401).send("Unauthorized");
 		});
 });
 
