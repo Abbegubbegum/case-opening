@@ -16,10 +16,13 @@
 			<button
 				type="button"
 				v-if="!authed"
-				@click="signInUser"
+				@click="googleSignIn"
 				class="login-btn"
 			>
 				Login
+			</button>
+			<button type="button" @click="getInventory" v-if="authed">
+				GetCase
 			</button>
 			<div class="inventory-container" v-if="authed"></div>
 		</div>
@@ -27,7 +30,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, useAttrs } from "vue";
 import CaseCanvas from "@/components/CaseCanvas.vue";
 import {
 	signInWithPopup,
@@ -41,46 +44,73 @@ export default defineComponent({
 	data() {
 		return {
 			authed: false,
+			admin: false,
 		};
 	},
 	methods: {
-		signInUser() {
+		async loginUserWithBackend() {
+			const user = getAuth().currentUser;
+			if (user) {
+				const idToken = await user.getIdToken();
+				const res = await fetch("/api/login", {
+					method: "POST",
+					headers: {
+						Accept: "application/json",
+						"Content-Type": "application/json",
+						"CSRF-Token": this.$cookies.get("XSRF-TOKEN"),
+					},
+					body: JSON.stringify({
+						idToken,
+					}),
+				});
+
+				if (res.ok) {
+					const adminAccess = await res.json();
+					this.authed = true;
+					this.admin = adminAccess;
+				} else if (res.status === 401) {
+					this.authed = false;
+					this.admin = false;
+				}
+			} else {
+				this.authed = false;
+				this.admin = false;
+			}
+		},
+		googleSignIn() {
 			signInWithPopup(getAuth(), new GoogleAuthProvider())
 				.then(async (data) => {
-					const user = getAuth().currentUser;
-					if (user) {
-						this.authed = true;
-						let idToken = await user.getIdToken();
-						await fetch("/api/login", {
-							method: "POST",
-							headers: {
-								Accept: "application/json",
-								"Content-Type": "application/json",
-								"CSRF-Token": this.$cookies.get("XSRF-TOKEN"),
-							},
-							body: JSON.stringify({ idToken }),
-						});
-						await signOut(getAuth());
-					}
+					await this.loginUserWithBackend();
 				})
 				.catch((err) => {
 					console.log("Error Signing in with Google " + err);
 				});
 		},
 		signOutUser() {
-			fetch("/api/logout").then((res) => {
+			signOut(getAuth()).then(() => {
 				this.authed = false;
 			});
 		},
+		async getInventory() {
+			let idToken = (await getAuth().currentUser?.getIdToken()) || "";
+			fetch(
+				"/api/inventory?" +
+					new URLSearchParams({
+						idToken,
+					})
+			)
+				.then(async (res) => {
+					console.log(await res.json());
+				})
+				.catch((err) => {
+					console.log(err);
+				});
+		},
 	},
 	created() {
-		try {
-			fetch("/api/session").then((res) => {
-				if (res.status === 200) {
-					this.authed = true;
-				}
-			});
-		} catch (err) {}
+		fetch("/api/csrf");
+
+		this.loginUserWithBackend();
 	},
 	components: { CaseCanvas },
 });
