@@ -21,16 +21,19 @@
 			>
 				Login
 			</button>
-			<button type="button" @click="getInventory" v-if="authed">
-				GetCase
-			</button>
-			<div class="inventory-container" v-if="authed"></div>
+			<div class="inventory-container" v-if="authed">
+				<InventoryItem
+					v-for="item in inventory"
+					:item="item"
+					@select="selectCase"
+				/>
+			</div>
 		</div>
 	</div>
 </template>
 
 <script lang="ts">
-import { defineComponent, useAttrs } from "vue";
+import { defineComponent } from "vue";
 import CaseCanvas from "@/components/CaseCanvas.vue";
 import {
 	signInWithPopup,
@@ -38,13 +41,18 @@ import {
 	GoogleAuthProvider,
 	signOut,
 } from "firebase/auth";
+import InventoryItem from "@/components/InventoryItem.vue";
 
 export default defineComponent({
 	name: "HomeView",
 	data() {
 		return {
-			authed: false,
+			authed: true,
 			admin: false,
+			inventory: [
+				{ CaseName: "Weapon Case", Quantity: 2 },
+				{ CaseName: "Bravo Case", Quantity: 1 },
+			],
 		};
 	},
 	methods: {
@@ -100,19 +108,23 @@ export default defineComponent({
 					})
 			)
 				.then(async (res) => {
-					console.log(await res.json());
+					this.inventory = await res.json();
+					console.log(this.inventory);
 				})
 				.catch((err) => {
 					console.log(err);
 				});
 		},
+		selectCase(item: any) {
+			
+		},
 	},
 	created() {
 		fetch("/api/csrf");
 
-		this.loginUserWithBackend();
+		// this.loginUserWithBackend();
 	},
-	components: { CaseCanvas },
+	components: { CaseCanvas, InventoryItem },
 });
 </script>
 
@@ -173,5 +185,19 @@ h1 {
 .login-btn:hover {
 	background-color: lightgray;
 	cursor: pointer;
+}
+
+.inventory-container {
+	display: flex;
+	justify-content: flex-start;
+	align-items: flex-start;
+	border: 3px solid #350000;
+	background-color: #0b0b0b;
+	margin-top: auto;
+	margin-bottom: 1rem;
+	width: 60vw;
+	height: 40vh;
+	box-shadow: 0 0 10px black;
+	border-radius: 15px;
 }
 </style>
