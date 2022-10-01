@@ -93,7 +93,7 @@ export default defineComponent({
 					headers: {
 						Accept: "application/json",
 						"Content-Type": "application/json",
-						"CSRF-Token": this.$cookies.get("XSRF-TOKEN"),
+						// "CSRF-Token": this.$cookies.get("XSRF-TOKEN"),
 					},
 					body: JSON.stringify({
 						idToken,
@@ -163,7 +163,7 @@ export default defineComponent({
 		},
 	},
 	mounted() {
-		fetch("/api/csrf");
+		// fetch("/api/csrf");
 
 		this.loginUserWithBackend();
 	},
