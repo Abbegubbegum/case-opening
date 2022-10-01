@@ -21,7 +21,15 @@
 			>
 				Login
 			</button>
-			<div class="inventory-container" v-if="authed">
+			<div v-if="!loaded && authed" class="loading-wrapper">
+				<div class="lds-ring">
+					<div></div>
+					<div></div>
+					<div></div>
+					<div></div>
+				</div>
+			</div>
+			<div class="inventory-container" v-if="authed && loaded">
 				<div
 					class="inventory-item"
 					@click="selectCase(weaponCase)"
@@ -67,6 +75,7 @@ export default defineComponent({
 			inventory: [] as any,
 			showPopup: false,
 			selectedItem: {},
+			loaded: false,
 		};
 	},
 	methods: {
@@ -77,6 +86,7 @@ export default defineComponent({
 		async loginUserWithBackend() {
 			const user = getAuth().currentUser;
 			if (user) {
+				this.authed = true;
 				const idToken = await user.getIdToken();
 				const res = await fetch("/api/login", {
 					method: "POST",
@@ -92,22 +102,25 @@ export default defineComponent({
 
 				if (res.ok) {
 					const adminAccess = await res.json();
-					await this.getInventory();
-					this.authed = true;
 					this.admin = adminAccess;
+					this.getInventory().then(() => {
+						this.loaded = true;
+					});
 				} else if (res.status === 401) {
 					this.authed = false;
 					this.admin = false;
+					this.loaded = false;
 				}
 			} else {
 				this.authed = false;
 				this.admin = false;
+				this.loaded = false;
 			}
 		},
 		googleSignIn() {
 			signInWithPopup(getAuth(), new GoogleAuthProvider())
-				.then(async (data) => {
-					await this.loginUserWithBackend();
+				.then((data) => {
+					this.loginUserWithBackend();
 				})
 				.catch((err) => {
 					console.log("Error Signing in with Google " + err);
@@ -116,6 +129,8 @@ export default defineComponent({
 		signOutUser() {
 			signOut(getAuth()).then(() => {
 				this.authed = false;
+				this.admin = false;
+				this.loaded = false;
 			});
 		},
 		async getInventory() {
@@ -213,6 +228,51 @@ h1 {
 .login-btn:hover {
 	background-color: lightgray;
 	cursor: pointer;
+}
+
+.loading-wrapper {
+	position: absolute;
+	height: 100%;
+	width: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.lds-ring {
+	display: inline-block;
+	position: relative;
+	width: 80px;
+	height: 80px;
+}
+.lds-ring div {
+	box-sizing: border-box;
+	display: block;
+	position: absolute;
+	width: 64px;
+	height: 64px;
+	margin: 8px;
+	border: 8px solid whitesmoke;
+	border-radius: 50%;
+	animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+	border-color: whitesmoke transparent transparent transparent;
+}
+.lds-ring div:nth-child(1) {
+	animation-delay: -0.45s;
+}
+.lds-ring div:nth-child(2) {
+	animation-delay: -0.3s;
+}
+.lds-ring div:nth-child(3) {
+	animation-delay: -0.15s;
+}
+@keyframes lds-ring {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
 }
 
 .inventory-container {
